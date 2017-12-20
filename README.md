@@ -63,6 +63,14 @@ This probably is the best part of the tool. The installation require minimum eff
         a. Utility that should be present are quite basic core Linux utility mostly comes with Default Linux build. Eg: curl, ssh.
         b. SMTP Setup is required for the tool to send Alerts for issue detection.
         
+Custom API Creation
+
+For few of the monitoring scenario one need to publish some custom API which is used by the script for monitoring.
+
+Hello API
+DB Connectivity Check API
+Certificate Expiry Check API
+
 The installation require the tools directory to be placed on any location on the host where the tool need to be executed. This is all it takes to install the tool. But please do go though the Tool technical overview section to understand how the tool should be setup for monitoring and finally initiate the actual monitiong. 
 
 ## 2. Tool technical overview
