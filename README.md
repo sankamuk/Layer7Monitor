@@ -102,20 +102,23 @@ The tool can be executed by
 
 ### 2.4. Toubleshooting steps
 
-The script has been build to log fairly verbose log level once you enable debug on, so that any issue if occured can be identified using the log only. The log for the each collection monitored is stated below:
+The script has been build to log fairly verbose log level once you enable debug on, so that any issue if occured can be identified using the log only. The log for the all modules along with the monther monitoring process goes in one single log stated below:
 
-SCOPE | LOCATION | LOG NAME
---- | --- | ---
-[collection_name] | log | **[collection_name].solr_monitor.log**
+LOCATION | LOG NAME
+--- | ---
+log | **layer7monitor.log**
 
-***NOTE*** The tool keeps the log file to a specified size ([PROPERTY] solr.monitor.logsizemb) in MB and autorotate keeping one additional backup file.
+***NOTE*** 
+
+        a. Utility that should be present are quite basic core Linux utility mostly comes with Default Linux build. Eg: curl, ssh.
+        b. SMTP Setup is required for the tool to send Alerts for issue detection.
+The tool keeps the log file to a specified size ([PROPERTY] solr.monitor.logsizemb) in MB and autorotate keeping one additional backup file.
 
 ### 2.5. Incident Management Tool Integration Process
 
 The tool can be easily intergrated with your current enterprise monitoring system to generate Incidents in your standard Enterprise Incident Management system. The below mechanism should be followed for the integration.
 
 * Enable Log Watcher module in your enterprise monitoring system on the monitoring host.
-* Enable reporting in tool by setting configuration value solr.monitor.report to true/TRUE.
 * Configure Log Watcher to search for pattern ***:ERROR:*** in report file inside history directory.
 
 
@@ -126,10 +129,10 @@ The propery file is the key to configure monitoring for your environment. The bl
 
 ## 4. Support and managebility
 
-If you are reading this README file then you are probably about to use the my tools to help you monitor your Hadoop Cluster. Good choice. This tool is made for you. Moreover this tool is free and always will be thats my promise.
+If you are reading this README file then you are probably about to use the my tools to help you monitor your API Gateway Infrastructure. Good choice. This tool is made for you. Moreover this tool is free and always will be thats my promise.
 
 Now it is hard to believe that you will get 24/7 Support thats too much to ask for. But in case you face any issue and want my intervention and you cannot debug the hundreeds lines of core Bash Script your self, please do not hassitate to write to me. Its a guarentee you will get an answer but it is not a guarentee you will have it in a SLA.
 
 Reach Me: sanmuk21@gmail.com
 
-Best of luck. Happy Monitoring your Solr Cloud.
+Best of luck. Happy Monitoring your API Gateway Infrastructure.
