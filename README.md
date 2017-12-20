@@ -78,27 +78,31 @@ The installation require the tools directory to be placed on any location on the
 
 [DIRECTORY] **history** - Contains report file for Incident Management integration and detecting previous alert published for stopping repated alerts. 
 
-[FILE] **.prop** - Main property file. This need to be filled for the tool to be operational.
+[DIRECTORY] **mail** - Directory containing mail templetes. 
 
-[FILE] **solr_monitor** - Module to monitor health check URL. 
+[FILE] **layer7monitor.prop** - Main property file. This need to be filled for the tool to be operational.
 
-[FILE] **solr_monitor** - Module to monitor health check URL. 
+[FILE] **urlmonitor** - Module to monitor health check URL. 
 
-[FILE] **solr_monitor** - Module to monitor health check URL. 
+[FILE] **hostmonitor** - Module to monitor health check of host. 
 
-[FILE] **solr_monitor** - Module to monitor health check URL. 
+[FILE] **dbmonitor** - Module to monitor health check Database. 
 
-[FILE] **scheduler** - Main executor script. This is to be executed from initiating the monitoring.
+[FILE] **certmonitor** - Module to monitor expiry Certificate installed. 
+
+[FILE] **mailsend** - Module to email alerts.
+
+[FILE] **layer7monitor** - Main executor script. This is to be executed from initiating the monitoring.
 
 ### 2.2. Execution Process
 
 The tool can be executed by
 
-[SCRIPT HOME]/scheduler 
+[SCRIPT HOME]/layer7monitor 
 
-***NOTE:*** Its imporatant to understand that just executing the monitor will not allow you to continuously monitor the environment and we should setup some kind of repeated execution mechanism via your Enterprise Scheduler, e.g. ControlM. As a sample setup the below example will help you execute the monitor in a periodically basis in a ***once every 3 hours*** using Unix default scheduler Crontab.
+***NOTE:*** Its imporatant to understand that just executing the monitor will not allow you to continuously monitor the environment and we should setup some kind of repeated execution mechanism via your Enterprise Scheduler, e.g. ControlM. As a sample setup the below example will help you execute the monitor in a periodically basis in a ***once every 1 hours*** using Unix default scheduler Crontab.
 
-> `* */3 * * * [SCRIPT HOME]/scheduler [collection_name] >> [SCRIPT HOME]/log/monitor.cron.log 2>> [SCRIPT HOME]/log/monitor.cron.log
+> `05 * * * * [SCRIPT HOME]/layer7monitor >> [SCRIPT HOME]/log/monitor.cron.log 2>> [SCRIPT HOME]/log/monitor.cron.log
 
 ### 2.4. Toubleshooting steps
 
@@ -110,9 +114,10 @@ log | **layer7monitor.log**
 
 ***NOTE*** 
 
-        a. Utility that should be present are quite basic core Linux utility mostly comes with Default Linux build. Eg: curl, ssh.
-        b. SMTP Setup is required for the tool to send Alerts for issue detection.
-The tool keeps the log file to a specified size ([PROPERTY] solr.monitor.logsizemb) in MB and autorotate keeping one additional backup file.
+        a. The tool keeps the log file to a specified size ([PROPERTY] layer7.logsizemb) in MB and autorotate keeping one additional backup file.
+        b. In case debug logs required for toubleshooting issue in script, it can be enabled by setting property ([PROPERTY] layer7.debug) to yes.
+        c. To identify issue specific to a module filter logs as following. Ex: URL -> ": URL :", Host -> ": HOST :", DB -> ": DB :", Cert -> ": CERT :".
+
 
 ### 2.5. Incident Management Tool Integration Process
 
@@ -124,7 +129,7 @@ The tool can be easily intergrated with your current enterprise monitoring syste
 
 ## 3. Property file overview and details of property monitored
 
-The propery file is the key to configure monitoring for your environment. The blank property file ***solr_monitor.prop*** is extensively commented to explain each and every property in quite detail fashion along with sample value.
+The propery file is the key to configure monitoring for your environment. 
 
 
 ## 4. Support and managebility
