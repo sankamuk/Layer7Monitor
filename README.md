@@ -69,6 +69,7 @@ For few of the monitoring scenario one need to publish some custom API which is 
 
 Hello API
 
+<img src="images/HELLO.jpg" height="300">
 
 DB Connectivity Check API
 
