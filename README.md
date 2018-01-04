@@ -79,6 +79,10 @@ DB Connectivity Check API
 
 Certificate Expiry Check API
 
+<img src="images/CERT_CHECK.jpg" height="300">
+
+<img src="images/CERT_CHECK_XMLPRSE.jpg" height="400">
+
 
 The installation require the tools directory to be placed on any location on the host where the tool need to be executed. This is all it takes to install the tool. But please do go though the Tool technical overview section to understand how the tool should be setup for monitoring and finally initiate the actual monitiong. 
 
