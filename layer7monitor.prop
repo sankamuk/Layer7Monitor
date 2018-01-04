@@ -1,0 +1,74 @@
+#############################################################################################################
+# Usage : This is the configuration for monitor Layer7 environment.
+#
+# Author: Sankar Mukherjee
+# Date  : 11 Dec, 2017
+#############################################################################################################
+
+# Global Configuration
+
+layer7.mail=
+layer7.debug=no
+layer7.logsizemb=200
+layer7.url.domonitor=yes
+layer7.hst.domonitor=yes
+layer7.db.domonitor=no
+layer7.cert.domonitor=no
+layer7.url.monitortime=10
+layer7.hst.monitortime=10
+layer7.db.monitortime=10
+layer7.cert.monitortime=10
+
+# URL Monitoring
+
+layer7.url.monitorurl=hello
+layer7.url.region=eu
+layer7.url.eu.env=prod,uat
+layer7.url.eu.prod.int.node=
+layer7.url.eu.prod.int.lb=
+layer7.url.eu.prod.ext.node=
+layer7.url.eu.prod.ext.lb=
+
+# Host Monitoring
+
+layer7.hst.docpu=yes
+layer7.hst.cpu.thrsh=10
+layer7.hst.domem=yes
+layer7.hst.mem.thrsh=90
+layer7.hst.dodisk=yes
+layer7.hst.disk.thrsh=90
+layer7.hst.disklist=/var/lib/mysql,/var/log/layer7
+layer7.hst.region=eu
+layer7.hst.eu.env=dev,uat
+layer7.hst.eu.dev.int.node=
+layer7.hst.eu.dev.ext.node=
+layer7.hst.eu.uat.int.node=
+layer7.hst.eu.uat.ext.node=
+
+# Database Monitoring
+
+layer7.db.dojdbc=
+layer7.db.jdbc.url=
+layer7.db.jdbc.region=eu
+layer7.db.jdbc.eu.env=prod,uat
+layer7.db.jdbc.eu.prod.int=
+layer7.db.jdbc.eu.prod.ext=
+layer7.db.jdbc.eu.uat.int=
+layer7.db.jdbc.eu.uat.ext=
+layer7.db.dorepl=
+layer7.db.repl.region=eu
+layer7.db.repl.eu.env=prod,uat
+layer7.db.repl.eu.prod.int=
+layer7.db.repl.eu.prod.ext=
+layer7.db.repl.eu.uat.int=
+layer7.db.repl.eu.uat.ext=
+
+# Certificate Monitoring
+
+layer7.cert.monitorurl=cert/expiry
+layer7.cert.region=eu
+layer7.cert.eu.env=prod,uat
+layer7.cert.eu.prod.int=
+layer7.cert.eu.prod.ext=
+layer7.cert.eu.uat.int=
+layer7.cert.eu.uat.ext=
