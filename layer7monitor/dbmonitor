@@ -52,12 +52,19 @@ if [ "$jdbc_mon" == "yes" ] ; then
 				if [ $? -ne 0 ] ; then
 					echo "[`date`] : ERROR : DB : Cannot extract DB Access check api for $jdbc."
 					issue_jdbc="${jdbc},${issue_jdbc}"
-				elif [ `grep -q "not OK" ${tmp_fl_db}` ] ; then
+                                elif [ $(grep -q "NOTOK" ${tmp_fl_db} ; echo $?) == 0 ] ; then
 					echo "[`date`] : ERROR : DB : DB Access check failed for $jdbc."
                                         echo "-----------------------------------------------------------"
 					cat ${tmp_fl_db}
 					echo "-----------------------------------------------------------"
-					issue_jdbc="${jdbc},${issue_jdbc}"
+                                        for dbStr in `cat ${tmp_fl_db} | grep "," | tr "," "\n"`
+                                        do
+                                                dbNm=$(echo $dbStr | awk -F"=" '{ print $1 }')
+                                                dbStat=$(echo $dbStr | awk -F"=" '{ print $2 }')
+                                                if [ "$dbStat" == "NOTOK" ] ; then
+                                                        issue_jdbc="${regn}.${env}.int.${dbNm},${issue_jdbc}"
+                                                fi
+                                        done
 				else
 					echo "[`date`] : INFO : DB : DB Access check successfull for $jdbc."
 				fi
@@ -74,12 +81,19 @@ if [ "$jdbc_mon" == "yes" ] ; then
                                 if [ $? -ne 0 ] ; then
                                         echo "[`date`] : ERROR : DB : Cannot extract DB Access check api for $jdbc."
                                         issue_jdbc="${jdbc},${issue_jdbc}"
-                                elif [ `grep -q "not OK" ${tmp_fl_db}` ] ; then
+                                elif [ $(grep -q "NOTOK" ${tmp_fl_db} ; echo $?) == 0 ] ; then
                                         echo "[`date`] : ERROR : DB : DB Access check failed for $jdbc."
                                         echo "-----------------------------------------------------------"
                                         cat ${tmp_fl_db}
                                         echo "-----------------------------------------------------------"
-                                        issue_jdbc="${jdbc},${issue_jdbc}"
+                                        for dbStr in `cat ${tmp_fl_db} | grep "," | tr "," "\n"`
+                                        do
+                                                dbNm=$(echo $dbStr | awk -F"=" '{ print $1 }')
+                                                dbStat=$(echo $dbStr | awk -F"=" '{ print $2 }')
+                                                if [ "$dbStat" == "NOTOK" ] ; then
+                                                        issue_jdbc="${regn}.${env}.ext.${dbNm},${issue_jdbc}"
+                                                fi
+                                        done
                                 else
                                         echo "[`date`] : INFO : DB : DB Access check successfull for $jdbc."
                                 fi
