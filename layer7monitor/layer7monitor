@@ -1,0 +1,105 @@
+#!/bin/bash
+#############################################################################################################
+# Usage : This script will monitor Layer7 environment.
+#         Property file present defines the environment to be monitored.
+# Author: Sankar Mukhejee
+# Date  : 11 Dec, 2017
+#############################################################################################################
+
+#############################################################################################################
+# Initialization section
+scpt_hm=$(cd $(dirname $0);pwd)
+if [ ! -f ${scpt_hm}/layer7monitor.prop ] ; then
+        echo "ERROR : Property file absent, thus aborting!!!"
+	#echo "ALERT: Property file absent. Thus not monitoring possible." | /bin/mailx \
+		#-s "ALERT - LAYER7 Montiroing - $(hostname)" -r LAYER7MONITOR "io.sanofi.MiddlewareJava@accenture.com"
+	echo "ALERT : Property file absent. Thus not monitoring possible." | /bin/mailx \
+		-s "ALERT - LAYER7 Montiroing - $(hostname)" -r LAYER7MONITOR "Sankar.Mukherjee-ext@sanofi.com"
+        exit 1
+fi 
+log_name=${scpt_hm}/log/layer7monitor.log
+mail_id=$(grep ^layer7.mail ${scpt_hm}/layer7monitor.prop | awk -F"=" '{ print $2 }')
+max_logsz=$(grep ^layer7.logsizemb ${scpt_hm}/layer7monitor.prop | awk -F"=" '{ print $2 }')
+url_mon=$(grep ^layer7.url.domonitor ${scpt_hm}/layer7monitor.prop | awk -F"=" '{ print $2 }')
+hst_mon=$(grep ^layer7.hst.domonitor ${scpt_hm}/layer7monitor.prop | awk -F"=" '{ print $2 }')
+db_mon=$(grep ^layer7.db.domonitor ${scpt_hm}/layer7monitor.prop | awk -F"=" '{ print $2 }')
+crt_mon=$(grep ^layer7.cert.domonitor ${scpt_hm}/layer7monitor.prop | awk -F"=" '{ print $2 }')
+url_montm=$(grep ^layer7.url.monitortime ${scpt_hm}/layer7monitor.prop | awk -F"=" '{ print $2 }')
+hst_montm=$(grep ^layer7.hst.monitortime ${scpt_hm}/layer7monitor.prop | awk -F"=" '{ print $2 }')
+db_montm=$(grep ^layer7.db.monitortime ${scpt_hm}/layer7monitor.prop | awk -F"=" '{ print $2 }')
+crt_montm=$(grep ^layer7.cert.monitortime ${scpt_hm}/layer7monitor.prop | awk -F"=" '{ print $2 }')
+[ -z "${mail_id}" ] && mail_id="io.sanofi.MiddlewareJava@accenture.com"
+[ -z "${max_logsz}" ] && max_logsz=100
+[ -z "${url_montm}" ] && url_montm=5
+[ -z "${hst_montm}" ] && hst_montm=5
+[ -z "${db_montm}" ] && hst_montm=5
+[ -z "${crt_montm}" ] && hst_montm=5
+max_montm=0
+
+# Rotate log file if required (File above required size will be rotated and one backup will be kept)
+[[ -f ${scpt_hm}/log/${log_name} ]] && [[ `du -sm ${scpt_hm}/log/${log_name} | awk \
+	'{ print $1 }'` -gt ${max_logsz} ]] && mv ${scpt_hm}/log/${log_name} ${scpt_hm}/log/${log_name}.bck
+
+# Validate if previous execution still running(hung detection)
+pid_own=$$
+prev_exec=$(ps -ef | grep layer7monitor | grep -v "$pid_own" | grep -v grep | wc -l)
+if [ ${prev_exec} -gt 1 ] ; then
+	echo "ALERT : Previous execution of monitoring script still executing." | /bin/mailx -s "ALERT - LAYER7 Montiroing - $(hostname)" -r LAYER7MONITOR  "${mail_id}"
+	echo "[`date`] : ERROR : Previous execution of monitoring script still executing." >> ${log_name}
+	exit 1
+fi
+
+#############################################################################################################
+# Execution section
+echo "[`date`] : INFO : Initiated Layer 7 Monitoring." >> ${log_name}
+if [ "${url_mon}" == "yes" -o "${hst_mon}" == "yes" ] ; then
+	# Execution individual modules 
+	if [ "${url_mon}" == "yes" ] ; then
+		echo "[`date`] : INFO : URL Monitoring requested thus initiating monitoring environment." >> ${log_name}
+		${scpt_hm}/urlmonitor ${scpt_hm}/layer7monitor.prop >> ${log_name} 2>> ${log_name} &
+		if [ $max_montm -lt $url_montm ] ; then
+			max_montm=$url_montm
+		fi
+	fi
+	if [ "${hst_mon}" == "yes" ] ; then
+                echo "[`date`] : INFO : Host Monitoring requested thus initiating monitoring environment." >> ${log_name}
+                ${scpt_hm}/hostmonitor ${scpt_hm}/layer7monitor.prop >> ${log_name} 2>> ${log_name} &
+		if [ $max_montm -lt $hst_montm ] ; then
+                        max_montm=$hst_montm
+                fi
+	fi
+        if [ "${db_mon}" == "yes" ] ; then
+                echo "[`date`] : INFO : DB Monitoring requested thus initiating monitoring environment." >> ${log_name}
+                ${scpt_hm}/dbmonitor ${scpt_hm}/layer7monitor.prop >> ${log_name} 2>> ${log_name} &
+                if [ $max_montm -lt $db_montm ] ; then
+                        max_montm=$db_montm
+                fi
+        fi
+        if [ "${crt_mon}" == "yes" ] ; then
+                echo "[`date`] : INFO : Certificate Monitoring requested thus initiating monitoring environment." >> ${log_name}
+                ${scpt_hm}/certmonitor ${scpt_hm}/layer7monitor.prop >> ${log_name} 2>> ${log_name} &
+                if [ $max_montm -lt $crt_montm ] ; then
+                        max_montm=$crt_montm
+                fi
+        fi
+        # Wait till individual monitorings are complete
+	sleep ${max_montm}m
+	# Validation phase
+	prev_url_exec=$(ps -ef | grep urlmonitor | grep -v grep)
+        prev_hst_exec=$(ps -ef | grep hostmonitor | grep -v grep)
+        prev_db_exec=$(ps -ef | grep dbmonitor | grep -v grep)
+        prev_crt_exec=$(ps -ef | grep certmonitor | grep -v grep)
+	if [ -n "${prev_url_exec}" -o -n "${prev_hst_exec}" -o -n "${prev_db_exec}" -o -n "${prev_crt_exec}" ] ; then
+		echo "[`date`] : ERROR : Previous execution of URL/Host/DB/Certificate Monitoring still executing." >> ${log_name}
+		echo "[`date`] : ERROR : Process List." >> ${log_name}
+                ps -ef | grep urlmonitor | grep -v grep >> ${log_name}
+                ps -ef | grep hostmonitor | grep -v grep >> ${log_name}
+                ps -ef | grep dbmonitor | grep -v grep >> ${log_name}
+                ps -ef | grep certmonitor | grep -v grep >> ${log_name}
+		echo "ALERT : Current execution of URL/Host/DB/Certificate Monitoring still executing." | /bin/mailx \
+			-s "ALERT - LAYER7 Montiroing - $(hostname)" -r LAYER7MONITOR "${mail_id}"
+		exit 1
+	fi
+fi
+echo "[`date`] : INFO : Completed Monitoring cycle."
+exit 0

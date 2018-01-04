@@ -1,0 +1,197 @@
+#!/bin/bash
+#############################################################################################################
+# Usage : This script will monitor Layer7 environment Host.
+#         Property file present defines the environment to be monitored.
+# Author: Sankar Mukhejee
+# Date  : 11 Dec, 2017
+#############################################################################################################
+
+#############################################################################################################
+# Utility function
+
+#############################################################################################################
+# Initialization section
+if [ $# -ne 1 ] ; then
+        echo "ERROR : HOST : Required parameter not passed!!!"
+        exit 1
+fi
+conf_fl=$1
+scpt_hm=$(cd $(dirname $0);pwd)
+tmp_fl=${scpt_hm}/tmp/hst.tmp.$$
+tmp_fl_dsk=${scpt_hm}/tmp/hst.tmp.dsk.$$
+mail_id=$(grep ^layer7.mail ${scpt_hm}/layer7monitor.prop | awk -F"=" '{ print $2 }')
+cpu_mon=$(grep ^layer7.hst.docpu ${scpt_hm}/layer7monitor.prop | awk -F"=" '{ print $2 }')
+cpu_thsh=$(grep ^layer7.hst.cpu.thrsh ${scpt_hm}/layer7monitor.prop | awk -F"=" '{ print $2 }')
+mem_mon=$(grep ^layer7.hst.domem ${scpt_hm}/layer7monitor.prop | awk -F"=" '{ print $2 }')
+mem_thsh=$(grep ^layer7.hst.mem.thrsh ${scpt_hm}/layer7monitor.prop | awk -F"=" '{ print $2 }')
+dsk_mon=$(grep ^layer7.hst.dodisk ${scpt_hm}/layer7monitor.prop | awk -F"=" '{ print $2 }')
+dsk_thsh=$(grep ^layer7.hst.disk.thrsh ${scpt_hm}/layer7monitor.prop | awk -F"=" '{ print $2 }')
+[ -z "${mail_id}" ] && mail_id="io.sanofi.MiddlewareJava@accenture.com"
+[ "${cpu_mon}" == "yes" -a -z "${cpu_thsh}" ] && cpu_thsh=10
+[ "${mem_mon}" == "yes" -a -z "${mem_thsh}" ] && mem_thsh=90
+[ "${dsk_mon}" == "yes" -a -z "${dsk_thsh}" ] && dsk_thsh=90
+
+#############################################################################################################
+# Execution section
+echo "[`date`] : INFO : HOST : Host Monitoring Initiated."
+regn_list=$(grep ^layer7.hst.region ${conf_fl} | awk -F"=" '{ print $2 }')
+issue_cpu=""
+issue_mem=""
+issue_dsk=""
+for regn in `echo ${regn_list} | tr "," " "`
+do
+	echo "[`date`] : INFO : HOST : Starting to monitor Host for region $regn."
+	env_list=$(grep ^layer7.hst.${regn}.env ${conf_fl} | awk -F"=" '{ print $2 }')
+	for env in `echo ${env_list} | tr "," " "`
+	do
+		echo "[`date`] : INFO : HOST : Starting to monitor Host for region $regn and environment $env."
+
+		echo "[`date`] : INFO : HOST : Checking Internal Host."
+		hst_list=$(grep ^layer7.hst.${regn}.${env}.int.node ${conf_fl} | awk -F"=" '{ print $2 }')
+		for hst in `echo ${hst_list} | tr "," " "`
+		do
+			echo "[`date`] : INFO : HOST : Starting to monitor host $hst."
+			rm -f ${tmp_fl}
+			doCont=0
+			timeout 4 ssh -o StrictHostKeyChecking=no -o BatchMode=yes -q "${hst}" "top -b -n 1" >> ${tmp_fl} 2>> ${tmp_fl}
+			if [ $? -ne 0 ] ; then
+				echo "[`date`] : ERROR : HOST : Cannot connect to server."
+				issue_cpu="$hst,$issue_cpu"
+                                issue_mem="$hst,$issue_mem"
+				issue_dsk="$hst,$issue_dsk"
+				doCont=1
+			fi
+			if [ $doCont -eq 0 -a "${cpu_mon}" == "yes" ] ; then
+				echo "[`date`] : INFO : HOST : Monitoring CPU for $hst."
+                                cpuidl=$(top -b -d1 -n1|grep -i "Cpu(s)"| awk -F'id' '{ print $1 }' | awk '{ print $NF }' | tr -d "%" | cut -d"." -f1)
+				echo "[`date`] : INFO : HOST : CPU Idle percentage of $hst is $cpuidl."
+				if [ $cpuidl -lt $cpu_thsh ] ; then
+					echo "[`date`] : ERROR : HOST : CPU Idle below threshold."
+					issue_cpu="$hst,$issue_cpu"
+				fi
+			fi
+                        if [ $doCont -eq 0 -a "${mem_mon}" == "yes" ] ; then
+				echo "[`date`] : INFO : HOST : Monitoring Memory for $hst."
+                                memtot=$(top -b -d1 -n1|grep -i Mem |grep -iv Swap |grep -i free |awk -F'total' '{ print $1 }' |awk '{ print $NF }'| tr -d [a-zA-Z])
+                                memusg=$(top -b -d1 -n1|grep -i Mem | grep -iv Swap |grep -i free |awk -F'used' '{ print $1 }' |awk '{ print $NF }' | tr -d [a-zA-Z])
+                                memperc=$((100*$memusg/$memtot))
+				memperc=$(echo $memperc | cut -d"." -f1)
+				echo "[`date`] : INFO : HOST : Memory usage percentage of $hst is $memperc."
+				if [ $mem_thsh -lt $memperc ] ; then
+                                        echo "[`date`] : ERROR : HOST : Memory usage crossed threshold."
+                                        issue_mem="$hst,$issue_mem"
+                                fi
+                        fi
+                        if [ $doCont -eq 0 -a "${dsk_mon}" == "yes" ] ; then
+				echo "[`date`] : INFO : HOST : Monitoring Disk for $hst."
+				disk_check_command=""
+				dsk_list=$(grep ^layer7.hst.disklist ${conf_fl} | awk -F"=" '{ print $2 }')
+				for disk in `echo ${dsk_list} | tr "," " "`
+				do
+					disk_check_command="${disk_check_command};df -P ${disk}"
+				done
+				disk_check_command="echo ${disk_check_command} | cut -f2-"
+				timeout 4 ssh -o StrictHostKeyChecking=no -o BatchMode=yes -q "${hst}" "${disk_check_command}" >> ${tmp_fl_dsk} 2>> ${tmp_fl_dsk}
+				dskstat=0
+				for disk in `echo ${dsk_list} | tr "," " "`
+				do
+					dskusg=$(cat ${tmp_fl_dsk} | grep "$disk" | awk '{ print $5 }' | tr -d "%")
+					if [ "$dskusg" -eq "$dskusg" ] 2>/dev/null; then
+                                                echo "[`date`] : INFO : HOST : Disk usgae for $dskusg is $disk."
+						if [ $dskusg -gt $dsk_thsh ] ; then
+							echo "[`date`] : ERROR : HOST : Disk usage crossing threshold. Current usage of $disk is $dskusg."
+							dskstat=1
+						fi
+                                        else
+                                                echo "[`date`] : ERROR : HOST : Cannot extract disk usage for Filesystem($disk)."
+                                                dskstat=1
+					fi
+				done
+				if [ $dskstat -eq 1 ] ; then
+                                        echo "[`date`] : ERROR : HOST : Disk usage has crossed threshold."
+                                        issue_dsk="$hst,$issue_dsk"
+				fi
+                        fi	
+			rm -f ${tmp_fl} ${tmp_fl_dsk}	
+			echo "[`date`] : INFO : HOST : Completed monitor host $hst."
+		done
+
+                echo "[`date`] : INFO : HOST : Checking External Host."
+                hst_list=$(grep ^layer7.hst.${regn}.${env}.ext.node ${conf_fl} | awk -F"=" '{ print $2 }')
+                for hst in `echo ${hst_list} | tr "," " "`
+                do
+                        echo "[`date`] : INFO : HOST : Starting to monitor host $hst."
+                        rm -f ${tmp_fl}
+                        timeout 4 ssh -o StrictHostKeyChecking=no -o BatchMode=yes -q "${hst}" "top -b -n 1" >> ${tmp_fl} 2>> ${tmp_fl}
+                        if [ $? -ne 0 ] ; then
+                                echo "[`date`] : ERROR : HOST : Cannot connect to server."
+                                issue_cpu="$hst,$issue_cpu"
+                                issue_mem="$hst,$issue_mem"
+                                issue_dsk="$hst,$issue_dsk"
+                        fi
+                        if [ $doCont -eq 0 -a "${cpu_mon}" == "yes" ] ; then
+                                echo "[`date`] : INFO : HOST : Monitoring CPU for $hst."
+                                cpuidl=$(top -b -d1 -n1|grep -i "Cpu(s)"| awk -F'id' '{ print $1 }' | awk '{ print $NF }' | tr -d "%" | cut -d"." -f1)
+                                echo "[`date`] : INFO : HOST : CPU Idle percentage of $hst is $cpuidl."
+                                if [ $cpuidl -lt $cpu_thsh ] ; then
+                                        echo "[`date`] : ERROR : HOST : CPU Idle below threshold."
+                                        issue_cpu="$hst,$issue_cpu"
+                                fi
+                        fi
+                        if [ $doCont -eq 0 -a "${mem_mon}" == "yes" ] ; then
+                                echo "[`date`] : INFO : HOST : Monitoring Memory for $hst."
+                                memtot=$(top -b -d1 -n1|grep -i Mem |grep -iv Swap |grep -i free |awk -F'total' '{ print $1 }' |awk '{ print $NF }'| tr -d [a-zA-Z])
+                                memusg=$(top -b -d1 -n1|grep -i Mem | grep -iv Swap |grep -i free |awk -F'used' '{ print $1 }' |awk '{ print $NF }' | tr -d [a-zA-Z])
+                                memperc=$((100*$memusg/$memtot))
+                                memperc=$(echo $memperc | cut -d"." -f1)
+                                echo "[`date`] : INFO : HOST : Memory usage percentage of $hst is $memperc."
+                                if [ $mem_thsh -lt $memperc ] ; then
+                                        echo "[`date`] : ERROR : HOST : Memory usage crossed threshold."
+                                        issue_mem="$hst,$issue_mem"
+                                fi
+                        fi
+                        if [ $doCont -eq 0 -a "${dsk_mon}" == "yes" ] ; then
+				echo "[`date`] : INFO : HOST : Monitoring Disk for $hst."
+                                disk_check_command=""
+                                dsk_list=$(grep ^layer7.hst.disklist ${conf_fl} | awk -F"=" '{ print $2 }')
+                                for disk in `echo ${dsk_list} | tr "," " "`
+                                do
+                                        disk_check_command="${disk_check_command};df -P ${disk}"
+                                done
+                                disk_check_command="echo ${disk_check_command} | cut -f2-"
+                                timeout 4 ssh -o StrictHostKeyChecking=no -o BatchMode=yes -q "${hst}" "${disk_check_command}" >> ${tmp_fl_dsk} 2>> ${tmp_fl_dsk}
+                                dskstat=0
+                                for disk in `echo ${dsk_list} | tr "," " "`
+                                do
+                                        dskusg=$(cat ${tmp_fl_dsk} | grep "$disk" | awk '{ print $5 }' | tr -d "%")
+                                        if [ "$dskusg" -eq "$dskusg" ] 2>/dev/null; then
+                                                echo "[`date`] : INFO : HOST : Disk usgae for $dskusg is $disk."
+                                                if [ $dskusg -gt $dsk_thsh ] ; then
+                                                        echo "[`date`] : ERROR : HOST : Disk usage crossing threshold. Current usage of $disk is $dskusg."
+                                                        dskstat=1
+                                                fi
+                                        else
+                                                echo "[`date`] : ERROR : HOST : Cannot extract disk usage for Filesystem($disk)."
+                                                dskstat=1
+                                        fi
+                                done
+                                if [ $dskstat -eq 1 ] ; then
+                                        echo "[`date`] : ERROR : HOST : Disk usage has crossed threshold."
+                                        issue_dsk="$hst,$issue_dsk"
+                                fi
+                        fi
+			rm -f ${tmp_fl}
+                        echo "[`date`] : INFO : HOST : Completed monitor host $hst."
+                done
+	done
+done
+
+#############################################################################################################
+# Reporting section
+if [ -n "${issue_cpu}" -o -n "${issue_mem}" -o -n "${issue_dsk}" ] ; then
+	echo "[`date`] : ERROR : HOST : Problem detected in this execution."
+        ${scpt_hm}/mailsend "host" "CPU:${issue_cpu},Memory:${issue_mem},Disk:${issue_dsk}"
+fi
+rm -f ${scpt_hm}/tmp/hst.tmp.*
+echo "[`date`] : INFO : HOST : Completed Host Monitoring cycle."
+exit 0

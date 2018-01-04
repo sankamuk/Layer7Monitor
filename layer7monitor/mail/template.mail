@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+</head>
+<body>
+<h1> <center>Layer 7 Monitoring</center> </h1> <br>
+<br>&nbsp;
+<br>&nbsp;
+
+<table style="width:80%"  border="1" align="center">
+<tr>
+<td colspan="3" align="center" bgcolor="AFBCBE"><b>ISSUE RECORD</b></td>
+</tr>
+<tr><th bgcolor="BBF1FA">Time</th><td>@@@_DATE_STRING_@@@</td></tr>
+<tr><th bgcolor="BBF1FA">Monitoring Host</th><td>@@@_MONITORING_HOST_@@@</td></tr>
+<tr><th bgcolor="BBF1FA">Error</th><td>@@@_ERROR_DETAIL_@@@</td></tr>
+<tr><th bgcolor="BBF1FA">Component Affected</th><td>@@@_AFFECTED_COMPONENT_@@@</td></tr>
+</table>
+
+<br>&nbsp;
+<br>&nbsp;
+</body>
+</html>

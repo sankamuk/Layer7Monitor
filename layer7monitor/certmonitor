@@ -1,0 +1,94 @@
+#!/bin/bash
+#############################################################################################################
+# Usage : This script will monitor Layer7 environment Certificates.
+#         Property file present defines the environment to be monitored.
+# Author: Sankar Mukherjee
+# Date  : 11 Dec, 2017
+#############################################################################################################
+
+#############################################################################################################
+# Utility function
+
+
+#############################################################################################################
+# Initialization section
+if [ $# -ne 1 ] ; then
+        echo "ERROR : CERT : Required parameter not passed!!!"
+        exit 1
+fi
+conf_fl=$1
+scpt_hm=$(cd $(dirname $0);pwd)
+tmp_fl=${scpt_hm}/tmp/cert.tmp.$$
+mail_id=$(grep ^layer7.mail ${scpt_hm}/layer7monitor.prop | awk -F"=" '{ print $2 }')
+[ -z "${mail_id}" ] && mail_id="io.sanofi.MiddlewareJava@accenture.com"
+monitor_url=$(grep ^layer7.cert.monitorurl ${conf_fl} | awk -F"=" '{ print $2 }')
+[ -z "${monitor_url}" ] && monitor_url="checkcert"
+echo "[`date`] : INFO : CERT :  URL to minitor is ${monitor_url}" 
+
+#############################################################################################################
+# Execution section
+regn_list=$(grep ^layer7.cert.region ${conf_fl} | awk -F"=" '{ print $2 }')
+issue_dn=""
+for regn in `echo ${regn_list} | tr "," " "`
+do
+	echo "[`date`] : INFO : CERT : Starting to monitor URL for region $regn."
+	env_list=$(grep ^layer7.cert.${regn}.env ${conf_fl} | awk -F"=" '{ print $2 }')
+	for env in `echo ${env_list} | tr "," " "`
+	do
+		echo "[`date`] : INFO : CERT : Starting to monitor Certs for region $regn and environment $env."
+		echo "[`date`] : INFO : CERT : Checking Internal Gateway."
+		url_list=$(grep ^layer7.cert.${regn}.${env}.int ${conf_fl} | awk -F"=" '{ print $2 }')
+		for url in `echo ${url_list} | tr "," " "`
+		do
+			echo "[`date`] : INFO : CERT : Checking Internal Gateway interface $url."
+			rm -f ${tmp_fl}
+			curl -m 20 -k "https://${url}/${monitor_url}" >> ${tmp_fl} 2>> ${tmp_fl}
+			for certLn in `grep -n "CN=" ${tmp_fl} | awk -F: '{ print $1 }'`
+			do
+				certDN=$(head -n $certLn ${tmp_fl} | tail -1 | awk -F"CN=" '{ print $2 }' | awk -F, '{ print $1 }')
+				certLnN=$(expr $certLn + 1)
+				certDt=$(head -n $certLnN ${tmp_fl} | tail -1 | awk -F"]" '{ print $1 }' | awk -F"-" '{ print $2 }' | cut -c2-)
+				certEpc=$(date --date="$certDt" +%s)
+				curEpc=$(date -d "+30 days" +%s)
+				echo "[`date`] : INFO : CERT : DN is $certDN Certificate Expires on $certDt ($certEpc), epoch of 30 days later from today $curEpc."
+				if [ $certEpc -lt $curEpc ] ; then
+					echo "[`date`] : ERROR : CERT : Certificate getting expired in next 30 days."
+					issue_dn="$certDN-$url,${issue_dn}"
+				fi
+			done
+                        rm -f ${tmp_fl}
+		done
+                echo "[`date`] : INFO : CERT : Checking External Gateway."
+                url_list=$(grep ^layer7.cert.${regn}.${env}.ext ${conf_fl} | awk -F"=" '{ print $2 }')
+                for url in `echo ${url_list} | tr "," " "`
+                do
+                        echo "[`date`] : INFO : CERT : Checking External Gateway interface $url."
+                        rm -f ${tmp_fl}
+                        curl -m 20 -k "https://${url}/${monitor_url}" >> ${tmp_fl} 2>> ${tmp_fl}
+                        for certLn in `grep -n "CN=" ${tmp_fl} | awk -F: '{ print $1 }'`
+                        do
+                                certDN=$(head -n $certLn ${tmp_fl} | tail -1 | awk -F"CN=" '{ print $2 }' | awk -F, '{ print $1 }')
+                                certLnN=$(expr $certLn + 1)
+                                certDt=$(head -n $certLnN ${tmp_fl} | tail -1 | awk -F"]" '{ print $1 }' | awk -F"-" '{ print $2 }' | cut -c2-)
+                                certEpc=$(date --date="$certDt" +%s)
+                                curEpc=$(date -d "+30 days" +%s)
+                                echo "[`date`] : INFO : CERT : DN is $certDN Certificate Expires on $certDt ($certEpc), epoch of 30 days later from today $curEpc."
+                                if [ $certEpc -lt $curEpc ] ; then
+                                        echo "[`date`] : ERROR : CERT : Certificate getting expired in next 30 days."
+                                        issue_dn="$certDN-$url,${issue_dn}"
+                                fi
+                        done
+                        rm -f ${tmp_fl}
+                done
+	done
+done
+
+#############################################################################################################
+# Reporting section
+if [ -n "${issue_dn}" ] ; then
+	echo "[`date`] : ERROR : CERT : Problem detected in this execution."
+	${scpt_hm}/mailsend "cert" "${issue_dn}"
+fi
+rm -f ${scpt_hm}/tmp/cert.tmp.*
+echo "[`date`] : INFO : CERT : Completed Certificate Monitoring cycle."
+exit 0

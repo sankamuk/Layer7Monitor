@@ -1,0 +1,115 @@
+#!/bin/bash
+#############################################################################################################
+# Usage : This script will monitor Layer7 environment URL.
+#         Property file present defines the environment to be monitored.
+# Author: Sankar Mukhejee
+# Date  : 11 Dec, 2017
+#############################################################################################################
+
+#############################################################################################################
+# Utility function
+url_check_func () {
+	urlstatval=0
+	retnstatval=0
+	dns_val=$1
+	mon_url=$2
+	tmpfl=$3
+	rm -f ${tmpfl}
+	fnl_url="https://$dns_val/$mon_url"
+	curl -m 10 -s -k "$fnl_url" >> ${tmpfl} 2>> ${tmpfl}
+	urlstatval=$?
+	echo "[`date`] : INFO : URL : Curl return code $urlstatval."
+        echo "[`date`] : INFO : URL : Curl return string - $(cat $tmpfl | tr "\n" "  ")."
+	grep -q "Hello from:" ${tmpfl}
+	retnstatval=$?
+	rm -f ${tmpfl}
+	if [ $urlstatval -eq 0 -a $retnstatval -eq 0 ] ; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+#############################################################################################################
+# Initialization section
+if [ $# -ne 1 ] ; then
+        echo "ERROR : URL : Required parameter not passed!!!"
+        exit 1
+fi
+conf_fl=$1
+scpt_hm=$(cd $(dirname $0);pwd)
+tmp_fl=${scpt_hm}/tmp/url.tmp.$$
+mail_id=$(grep ^layer7.mail ${scpt_hm}/layer7monitor.prop | awk -F"=" '{ print $2 }')
+[ -z "${mail_id}" ] && mail_id="io.sanofi.MiddlewareJava@accenture.com"
+monitor_url=$(grep ^layer7.url.monitorurl ${conf_fl} | awk -F"=" '{ print $2 }')
+[ -z "${monitor_url}" ] && monitor_url="hello"
+echo "[`date`] : INFO: URL to minitor is ${monitor_url}" 
+
+#############################################################################################################
+# Execution section
+regn_list=$(grep ^layer7.url.region ${conf_fl} | awk -F"=" '{ print $2 }')
+issue_url=""
+for regn in `echo ${regn_list} | tr "," " "`
+do
+	echo "[`date`] : INFO: Starting to monitor URL for region $regn."
+	env_list=$(grep ^layer7.url.${regn}.env ${conf_fl} | awk -F"=" '{ print $2 }')
+	for env in `echo ${env_list} | tr "," " "`
+	do
+		echo "[`date`] : INFO : URL : Starting to monitor URL for region $regn and environment $env."
+		echo "[`date`] : INFO : URL : Checking Internal Direct URL."
+		url_list=$(grep ^layer7.url.${regn}.${env}.int.node ${conf_fl} | awk -F"=" '{ print $2 }')
+		for url in `echo ${url_list} | tr "," " "`
+		do
+			echo "[`date`] : INFO : URL : Checking Internal Direct URL $url."
+                        url_check_func "$url" "$monitor_url" "$tmp_fl"
+                        if [ $? -ne 0 ] ; then
+				echo "[`date`] : ERROR : URL : Return code non successful. RETURNCODE(CURL STATUS:HELLO MESSEGE): $retval."
+				issue_url="REGION=$regn, ENV=$env, URL=$url. $issue_url" 
+			fi
+		done
+                echo "[`date`] : INFO : URL : Checking Internal LB URL."
+                url_list=$(grep ^layer7.url.${regn}.${env}.int.lb ${conf_fl} | awk -F"=" '{ print $2 }')
+                for url in `echo ${url_list} | tr "," " "`
+                do
+                        echo "[`date`] : INFO : URL : Checking Internal LB URL $url."
+                        url_check_func "$url" "$monitor_url" "$tmp_fl"
+                        if [ $? -ne 0 ] ; then
+                                echo "[`date`] : ERROR : URL : Return code non successful. RETURNCODE(CURL STATUS:HELLO MESSEGE): $retval."
+                                issue_url="REGION=$regn, ENV=$env, URL=$url. $issue_url"
+                        fi
+                done
+		echo "[`date`] : INFO : URL : Checking External URL."
+                echo "[`date`] : INFO : URL : Checking External Direct URL."
+                url_list=$(grep ^layer7.url.${regn}.${env}.ext.node ${conf_fl} | awk -F"=" '{ print $2 }')
+                for url in `echo ${url_list} | tr "," " "`
+                do
+                        echo "[`date`] : INFO : URL : Checking External Direct URL $url."
+                        url_check_func "$url" "$monitor_url" "$tmp_fl"
+                        if [ $? -ne 0 ] ; then
+                                echo "[`date`] : ERROR : URL : Return code non successful. RETURNCODE(CURL STATUS:HELLO MESSEGE): $retval."
+                                issue_url="REGION=$regn, ENV=$env, URL=$url. $issue_url"
+                        fi
+                done
+                echo "[`date`] : INFO : URL : Checking External LB URL."
+                url_list=$(grep ^layer7.url.${regn}.${env}.ext.lb ${conf_fl} | awk -F"=" '{ print $2 }')
+                for url in `echo ${url_list} | tr "," " "`
+                do
+                        echo "[`date`] : INFO : URL : Checking External LB URL $url."
+                        url_check_func "$url" "$monitor_url" "$tmp_fl"
+                        if [ $? -ne 0 ] ; then
+                                echo "[`date`] : ERROR : URL : Return code non successful. RETURNCODE(CURL STATUS:HELLO MESSEGE): $retval."
+                                issue_url="REGION=$regn, ENV=$env, URL=$url. $issue_url"
+                        fi
+                done
+	done
+done
+
+#############################################################################################################
+# Reporting section
+if [ -n "${issue_url}" ] ; then
+	echo "[`date`] : ERROR : URL : Problem detected in this execution."
+        ${scpt_hm}/mailsend "url" "${issue_url}"
+fi
+rm -f ${scpt_hm}/tmp/url.tmp.*
+echo "[`date`] : INFO : URL : Completed URL Monitoring cycle."
+exit 0

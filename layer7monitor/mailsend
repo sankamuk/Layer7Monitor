@@ -1,0 +1,64 @@
+#!/bin/bash
+#############################################################################################################
+# Usage : This script will send mail for alerts.
+#         mailsend [TEMPLATE NAME] [ERROR STRING] 
+# Author: Sankar Mukhejee
+# Date  : 11 Dec, 2017
+#############################################################################################################
+scpt_hm=$(cd $(dirname $0);pwd)
+#############################################################################################################
+# Initialization section
+if [ $# -ne 2 ] ; then
+        echo "ERROR : MAIL : Required parameter not passed!!!"
+        exit 1
+fi
+if [ ! -f ${scpt_hm}/mail/template.mail ] ; then
+        echo "[`date`] : ERROR : MAIL : Required template not present. Exiting before sending mail."
+        exit 1
+fi
+if [ ! -f ${scpt_hm}/layer7monitor.prop ] ; then
+        echo "[`date`] : ERROR : MAIL : Property file not present."
+        exit 1
+fi
+templt=$1
+errstr=$2
+temp_mail_body=${scpt_hm}/tmp/mail.tmp.$$
+mail_id=$(grep ^layer7.mail ${scpt_hm}/layer7monitor.prop | awk -F"=" '{ print $2 }')
+echo "[`date`] : INFO : MAIL : Mail moule called for template ${templt} and string - ${errstr}."
+cp ${scpt_hm}/mail/template.mail ${temp_mail_body}
+
+#############################################################################################################
+# Execution section
+error_reason=""
+case "$templt" in
+   "url")  echo "[`date`] : INFO : MAIL : Issue in URL status check."
+           error_reason="URL Monitoring unsuccessful."
+           ;;
+   "host") echo "[`date`] : INFO : MAIL : Issue in Host monitoring."
+           error_reason="Host Monitoring unsuccessful."
+           ;;
+   "db")   echo "[`date`] : INFO : MAIL : Issue in Database monitoring."
+           error_reason="Database Monitoring unsuccessful."
+           ;;
+   "cert") echo "[`date`] : INFO : MAIL : Issue in Certificate monitoring."
+           error_reason="Certificate Monitoring unsuccessful."
+           ;;
+esac
+
+echo "[`date`] : INFO : MAIL : Starting to prepare mail body."
+sed -i 's/@@@_DATE_STRING_@@@/$(date)/g' ${temp_mail_body}
+sed -i 's/@@@_MONITORING_HOST_@@@/$(hostname)/g' ${temp_mail_body}
+sed -i 's/@@@_ERROR_DETAIL_@@@/${error_reason}/g' ${temp_mail_body}
+sed -i 's/@@@_AFFECTED_COMPONENT_@@@/${errstr}/g' ${temp_mail_body}
+
+(
+  echo To: ${mail_id}
+  echo From: Layer7Admin
+  echo "Content-Type: text/html; "
+  echo "Subject: ERROR - Layer7 Monitoring "
+  echo ""
+  cat ${temp_mail_body}
+) | /usr/sbin/sendmail -t
+
+rm -f ${temp_mail_body}
+exit 0

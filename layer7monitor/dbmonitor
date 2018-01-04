@@ -1,0 +1,186 @@
+#!/bin/bash
+#############################################################################################################
+# Usage : This script will monitor Layer7 environment Databases.
+#         Property file present defines the environment to be monitored.
+# Author: Sankar Mukhejee
+# Date  : 11 Dec, 2017
+#############################################################################################################
+
+#############################################################################################################
+# Utility function
+
+#############################################################################################################
+# Initialization section
+if [ $# -ne 1 ] ; then
+        echo "ERROR : DB : Required parameter not passed!!!"
+        exit 1
+fi
+conf_fl=$1
+scpt_hm=$(cd $(dirname $0);pwd)
+tmp_fl_db=${scpt_hm}/tmp/db.tmp.jdbc.$$
+tmp_fl_repla=${scpt_hm}/tmp/db.tmp.repl.actv.$$
+tmp_fl_replp=${scpt_hm}/tmp/db.tmp.repl.psv.$$
+mail_id=$(grep ^layer7.mail ${scpt_hm}/layer7monitor.prop | awk -F"=" '{ print $2 }')
+jdbc_mon=$(grep ^layer7.db.dojdbc ${scpt_hm}/layer7monitor.prop | awk -F"=" '{ print $2 }')
+jdbc_url=$(grep ^layer7.db.jdbc.url ${scpt_hm}/layer7monitor.prop | awk -F"=" '{ print $2 }')
+repl_mon=$(grep ^layer7.db.dorepl ${scpt_hm}/layer7monitor.prop | awk -F"=" '{ print $2 }')
+[ -z "${mail_id}" ] && mail_id="io.sanofi.MiddlewareJava@accenture.com"
+[ "${jdbc_mon}" == "yes" -a -z "${jdbc_url}" ] && jdbc_url=jdbc
+
+#############################################################################################################
+# Execution section
+echo "[`date`] : INFO : DB : Database Monitoring Initiated."
+if [ "$jdbc_mon" == "yes" ] ; then
+	echo "[`date`] : INFO : DB : Starting to monitor DB access."
+	issue_jdbc=""
+	regn_list=$(grep ^layer7.db.jdbc.region ${conf_fl} | awk -F"=" '{ print $2 }')
+	for regn in `echo ${regn_list} | tr "," " "`
+	do
+		echo "[`date`] : INFO : DB : Starting to monitor DB access for region $regn."
+		env_list=$(grep ^layer7.db.jdbc.${regn}.env ${conf_fl} | awk -F"=" '{ print $2 }')
+		for env in `echo ${env_list} | tr "," " "`
+		do
+			echo "[`date`] : INFO : DB : Starting to monitor DB access for region $regn and environment $env."
+			
+			echo "[`date`] : INFO : DB : Checking Internal Gateway."
+			jdbc_chk_api=$(grep ^layer7.db.jdbc.${regn}.${env}.int ${conf_fl} | awk -F"=" '{ print $2 }')
+			for jdbc in `echo ${jdbc_chk_api} | tr "," " "`
+			do
+				echo "[`date`] : INFO : DB : Starting to check DB Access for $jdbc."
+				rm -f ${tmp_fl_db}
+				curl -m 10 -s -k "https://${jdbc}/${jdbc_mon}" >> ${tmp_fl_db} 2>> ${tmp_fl_db}
+				if [ $? -ne 0 ] ; then
+					echo "[`date`] : ERROR : DB : Cannot extract DB Access check api for $jdbc."
+					issue_jdbc="${jdbc},${issue_jdbc}"
+				elif [ `grep -q "not OK" ${tmp_fl_db}` ] ; then
+					echo "[`date`] : ERROR : DB : DB Access check failed for $jdbc."
+                                        echo "-----------------------------------------------------------"
+					cat ${tmp_fl_db}
+					echo "-----------------------------------------------------------"
+					issue_jdbc="${jdbc},${issue_jdbc}"
+				else
+					echo "[`date`] : INFO : DB : DB Access check successfull for $jdbc."
+				fi
+			done
+                        rm -f ${tmp_fl_db}
+
+                        echo "[`date`] : INFO : DB : Checking External Gateway."
+                        jdbc_chk_api=$(grep ^layer7.db.jdbc.${regn}.${env}.ext ${conf_fl} | awk -F"=" '{ print $2 }')
+                        for jdbc in `echo ${jdbc_chk_api} | tr "," " "`
+                        do
+                                echo "[`date`] : INFO : DB : Starting to check DB Access for $jdbc."
+                                rm -f ${tmp_fl_db}
+                                curl -m 10 -s -k "https://${jdbc}/${jdbc_mon}" >> ${tmp_fl_db} 2>> ${tmp_fl_db}
+                                if [ $? -ne 0 ] ; then
+                                        echo "[`date`] : ERROR : DB : Cannot extract DB Access check api for $jdbc."
+                                        issue_jdbc="${jdbc},${issue_jdbc}"
+                                elif [ `grep -q "not OK" ${tmp_fl_db}` ] ; then
+                                        echo "[`date`] : ERROR : DB : DB Access check failed for $jdbc."
+                                        echo "-----------------------------------------------------------"
+                                        cat ${tmp_fl_db}
+                                        echo "-----------------------------------------------------------"
+                                        issue_jdbc="${jdbc},${issue_jdbc}"
+                                else
+                                        echo "[`date`] : INFO : DB : DB Access check successfull for $jdbc."
+                                fi
+                        done
+			rm -f ${tmp_fl_db}
+		done
+	done
+fi
+if [ "repl_mon" == "yes" ] ; then
+        echo "[`date`] : INFO : DB : Starting to monitor DB Replication."
+	issue_repl=""
+	regn_list=$(grep ^layer7.db.repl.region ${conf_fl} | awk -F"=" '{ print $2 }')
+        for regn in `echo ${regn_list} | tr "," " "`
+        do
+		echo "[`date`] : INFO : DB : Starting to monitor DB replication for region $regn."
+		env_list=$(grep ^layer7.db.repl.${regn}.env ${conf_fl} | awk -F"=" '{ print $2 }')
+                for env in `echo ${env_list} | tr "," " "`
+                do
+                        echo "[`date`] : INFO : DB : Starting to monitor DB replication for region $regn and environment $env."
+			
+			echo "[`date`] : INFO : DB : Checking Internal Host."
+			reldb_list=$(grep ^layer7.db.repl.${regn}.${env}.int ${conf_fl} | awk -F"=" '{ print $2 }')
+			for reldb in `echo ${reldb_list} | tr "," " "`
+			do
+				echo $reldb | grep -q ":::" 
+				if [ $? -ne 0 ] ; then
+					echo "[`date`] : ERROR : DB : Configuration file not correctly formatted, $reldb."
+				else
+					actvsrv=$(echo $reldb | awk -F":::" '{ print $1 }')
+					psvsrv=$(echo $reldb | awk -F":::" '{ print $2 }')
+					timeout 4 ssh -o StrictHostKeyChecking=no -o BatchMode=yes -q ${actvsrv} "mysql -e 'show slave status \G'" > ${tmp_fl_repla}
+					actvstat=$?
+					timeout 4 ssh -o StrictHostKeyChecking=no -o BatchMode=yes -q ${psvsrv} "mysql -e 'show slave status \G'" > ${tmp_fl_replp}
+					psvstat=$?
+					if [ ${actvstat} -ne 0 -o ${psvstat} -ne 0 ] ; then
+						echo "[`date`] : ERROR : DB : Issue in extracting replication status for some DB."
+                                                echo "Host: ${actvsrv} Status: ${actvstat}, Host: ${psvsrv} Status: ${psvstat}."
+						issue_repl="${reldb},${issue_repl}" 
+					else
+						io_stata=$(grep -w Slave_IO_Running ${tmp_fl_repla} | awk '{ print $2 }')
+						sql_stata=$(grep -w Slave_SQL_Running ${tmp_fl_repla} | awk '{ print $2 }')
+						io_statp=$(grep -w Slave_IO_Running ${tmp_fl_replp} | awk '{ print $2 }')
+                                                sql_statp=$(grep -w Slave_SQL_Running ${tmp_fl_replp} | awk '{ print $2 }')
+						echo "[`date`] : INFO : DB : Replication status:"
+						echo "Node:$actvsrv, Slave IO:$io_stata, Slave SQL:$sql_stata. Node:$psvsrv, Slave IO:$io_statp, Slave SQL:$sql_statp."
+						if [ "${io_stata}" != "Yes" -o "${sql_stata}" != "Yes" -o "${io_statp}" != "Yes" -o "${sql_statp}" != "Yes" ] ; then
+							echo "[`date`] : ERROR : DB : Issue in replication detected for $reldb."
+							issue_repl="${reldb},${issue_repl}"
+						else
+							echo "[`date`] : INFO : DB : No issue in replication detected for $reldb."
+						fi
+					fi
+				fi
+			done
+			rm -f ${tmp_fl_repla} ${tmp_fl_replp}
+
+                        echo "[`date`] : INFO : DB : Checking External Host."
+                        reldb_list=$(grep ^layer7.db.repl.${regn}.${env}.ext ${conf_fl} | awk -F"=" '{ print $2 }')
+                        for reldb in `echo ${reldb_list} | tr "," " "`
+                        do
+                                echo $reldb | grep -q ":::"
+                                if [ $? -ne 0 ] ; then
+                                        echo "[`date`] : ERROR : DB : Configuration file not correctly formatted, $reldb."
+                                else
+                                        actvsrv=$(echo $reldb | awk -F":::" '{ print $1 }')
+                                        psvsrv=$(echo $reldb | awk -F":::" '{ print $2 }')
+                                        timeout 4 ssh -o StrictHostKeyChecking=no -o BatchMode=yes -q ${actvsrv} "mysql -e 'show slave status \G'" > ${tmp_fl_repla}
+                                        actvstat=$?
+                                        timeout 4 ssh -o StrictHostKeyChecking=no -o BatchMode=yes -q ${psvsrv} "mysql -e 'show slave status \G'" > ${tmp_fl_replp}
+                                        psvstat=$?
+                                        if [ ${actvstat} -ne 0 -o ${psvstat} -ne 0 ] ; then
+                                                echo "[`date`] : ERROR : DB : Issue in extracting replication status for some DB."
+                                                echo "Host: ${actvsrv} Status: ${actvstat}, Host: ${psvsrv} Status: ${psvstat}."
+                                                issue_repl="${reldb},${issue_repl}"
+                                        else
+                                                io_stata=$(grep -w Slave_IO_Running ${tmp_fl_repla} | awk '{ print $2 }')
+                                                sql_stata=$(grep -w Slave_SQL_Running ${tmp_fl_repla} | awk '{ print $2 }')
+                                                io_statp=$(grep -w Slave_IO_Running ${tmp_fl_replp} | awk '{ print $2 }')
+                                                sql_statp=$(grep -w Slave_SQL_Running ${tmp_fl_replp} | awk '{ print $2 }')
+                                                echo "[`date`] : INFO : DB : Replication status:"
+                                                echo "Node:$actvsrv, Slave IO:$io_stata, Slave SQL:$sql_stata. Node:$psvsrv, Slave IO:$io_statp, Slave SQL:$sql_statp."
+                                                if [ "${io_stata}" != "Yes" -o "${sql_stata}" != "Yes" -o "${io_statp}" != "Yes" -o "${sql_statp}" != "Yes" ] ; then
+                                                        echo "[`date`] : ERROR : DB : Issue in replication detected for $reldb."
+                                                        issue_repl="${reldb},${issue_repl}"
+                                                else
+                                                        echo "[`date`] : INFO : DB : No issue in replication detected for $reldb."
+                                                fi
+                                        fi
+                                fi
+                        done
+                        rm -f ${tmp_fl_repla} ${tmp_fl_replp}
+		done
+	done
+fi
+
+#############################################################################################################
+# Reporting section
+if [ -n "${issue_jdbc}" -o -n "${issue_repl}" -o -n "${issue_dsk}" ] ; then
+	echo "[`date`] : ERROR : DB : Problem detected in this execution."
+	${scpt_hm}/mailsend "db" "DB_ACCESS:${issue_jdbc},DB_REPLICATION:${issue_repl}"
+fi
+rm -f ${scpt_hm}/tmp/db.tmp.*
+echo "[`date`] : INFO : DB : Completed Host Monitoring cycle."
+exit 0
