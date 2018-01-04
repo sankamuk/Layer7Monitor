@@ -5,25 +5,44 @@
 # Date  : 11 Dec, 2017
 #############################################################################################################
 
-# Global Configuration
+############################################################################################
+## Global Configuration
+############################################################################################
 
+# The mail email DL for alert ntification
 layer7.mail=sanmuk21@gmail.com
+# Set debug logging ON
 layer7.debug=no
+# Log file max size in MB
 layer7.logsizemb=200
+# URL Monitoring Status
 layer7.url.domonitor=yes
+# Host Monitoring Status
 layer7.hst.domonitor=yes
+# Database Monitoring Status
 layer7.db.domonitor=no
+# Certificate Monitoring Status
 layer7.cert.domonitor=no
+# URL Monitoring expected time
 layer7.url.monitortime=10
+# Host Monitoring expected time
 layer7.hst.monitortime=10
+# Database Monitoring expected time
 layer7.db.monitortime=10
+# Certificate Monitoring expected time
 layer7.cert.monitortime=10
 
-# URL Monitoring
+############################################################################################
+## URL Monitoring
+############################################################################################
 
+# API used to perform URL Monitoring
 layer7.url.monitorurl=hello
+
+# Monitoring Infrastructure Map
 layer7.url.region=eu
 layer7.url.eu.env=prod,uat
+# Multiple infrastucture at any level should be specified as comma separated value, e.g. val1,val2
 layer7.url.eu.prod.int.node=api1.eu.prod.sanmuk.com:9443,api2.eu.prod.sanmuk.com:9443
 layer7.url.eu.prod.int.lb=
 layer7.url.eu.prod.ext.node=
@@ -33,40 +52,67 @@ layer7.url.eu.uat.int.lb=
 layer7.url.eu.uat.ext.node=
 layer7.url.eu.uat.ext.lb=
 
-# Host Monitoring
+## Host Monitoring
 
+# Host CPU Monitoring Status
 layer7.hst.docpu=yes
+# Host CPU Monitoring Threshold
 layer7.hst.cpu.thrsh=10
+# Host Memory Monitoring Status
 layer7.hst.domem=yes
+# Host Memory Monitoring Threshold
 layer7.hst.mem.thrsh=90
+# Host Filesystem Monitoring Status
 layer7.hst.dodisk=yes
+# Host Filesystem Monitoring Threshold
 layer7.hst.disk.thrsh=90
+# Host List of Filesystems to Monitor
 layer7.hst.disklist=/var/lib/mysql,/var/log/layer7
+
+# Monitoring Infrastructure Map
 layer7.hst.region=eu
 layer7.hst.eu.env=dev
+# Multiple infrastucture at any level should be specified as comma separated value, e.g. val1,val2
 layer7.hst.eu.dev.int.node=
 layer7.hst.eu.dev.ext.node=
 
-# Database Monitoring
+############################################################################################
+## Database Monitoring
+############################################################################################
 
+# Database Connectivity Monitoring Status
 layer7.db.dojdbc=
+# Database Connectivity Monitoring API
 layer7.db.jdbc.url=
+
+# Monitoring Infrastructure Map
 layer7.db.jdbc.region=eu
 layer7.db.jdbc.eu.env=prod
+# Multiple infrastucture at any level should be specified as comma separated value, e.g. val1,val2
 layer7.db.jdbc.eu.prod.int=
 layer7.db.jdbc.eu.prod.ext=
 
+# Database Replication Monitoring Status
 layer7.db.dorepl=
+
+# Monitoring Infrastructure Map
 layer7.db.repl.region=eu
 layer7.db.repl.eu.env=prod
+# Multiple infrastucture at any level should be specified as comma separated value, also each value below will be a pair of replication hosts separated by :::, e.g. host1:::host2,host3:::host4
 layer7.db.repl.eu.prod.int=
 layer7.db.repl.eu.prod.ext=
 
-# Certificate Monitoring
+############################################################################################
+## Certificate Monitoring
+############################################################################################
 
+# Certificate Monitoring API
 layer7.cert.monitorurl=cert/expiry
+
+# Monitoring Infrastructure Map
 layer7.cert.region=eu
 layer7.cert.eu.env=prod
+# Multiple infrastucture at any level should be specified as comma separated value, e.g. val1,val2
 layer7.cert.eu.prod.int=
 layer7.cert.eu.prod.ext=
 
