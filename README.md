@@ -67,22 +67,28 @@ This probably is the best part of the tool. The installation require minimum eff
 
 For few of the monitoring scenario one need to publish some custom API which is used by the script for monitoring.
 
-Hello API
+##### Hello API
 
 <img src="images/HELLO.jpg" height="300">
 
-DB Connectivity Check API
+<img src="images/HELLO_API.jpg" height="100">
+
+##### DB Connectivity Check API
 
 <img src="images/JDBC_CHECK.jpg" height="300">
 
 <img src="images/JDBC_CHECK_XMLPRSE.jpg" height="400">
 
+<img src="images/JDBC_API.jpg" height="100">
 
-Certificate Expiry Check API
+##### Certificate Expiry Check API
 
 <img src="images/CERT_CHECK.jpg" height="300">
 
 <img src="images/CERT_CHECK_XMLPRSE.jpg" height="400">
+
+<img src="images/CERT_API.jpg" height="100">
+
 
 
 The installation require the tools directory to be placed on any location on the host where the tool need to be executed. This is all it takes to install the tool. But please do go though the Tool technical overview section to understand how the tool should be setup for monitoring and finally initiate the actual monitiong. 
