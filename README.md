@@ -69,7 +69,13 @@ For few of the monitoring scenario one need to publish some custom API which is 
 
 Hello API
 
+
 DB Connectivity Check API
+
+<img src="images/JDBC_CHECK.jpg" height="300">
+
+<img src="images/JDBC_CHECK_XMLPRSE.jpg" height="400">
+
 
 Certificate Expiry Check API
 
