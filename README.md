@@ -158,7 +158,17 @@ The tool can be easily intergrated with your current enterprise monitoring syste
 ## 3. Property file overview and details of property monitored
 
 The propery file is the key to configure monitoring for your environment. 
+The sample property file attached is quite verbose will explain the requirement for each property. 
 
+Only one single point needs separate explaination is "Monitoring Infrastructure Map", this section lays out to the script the infrastructure to be monitored. The whole Layer 7 infrastructure is visualizes to be segregated in different regions (e.g. Europe as eu, AMERICA as na, ASIA as apac) if not just use a default region Global gbl. Again each region is though to be segrated into different environments (e.g. Devolopment as dev, UAT as uat, Production as prod) if not just use a default environment Environment env. Again for each region and for each environment under it is thought to be having Internal Gateway Infrastructue (inside corporate network) and External Gateway Infrastructue (inside corporate DMZ network, with external Internet exposure). 
+
+layer7.[Monitoring Module].[Region].[Environment].[Internal/External Network].[Component]=
+
+***Note***
+
+        a. Only URL Monitoring Infrastructure Map has sub component, i.e. one for direct Node URL and Lodebalancer URL.
+        b. Each monitoring component value can be a list which is comma seprated.
+        c. Each database replication monitoring component should be a pair of replication hosts separated by :::.
 
 ## 4. Support and managebility
 
