@@ -62,6 +62,8 @@ This probably is the best part of the tool. The installation require minimum eff
 
         a. Utility that should be present are quite basic core Linux utility mostly comes with Default Linux build. Eg: curl, ssh.
         b. SMTP Setup is required for the tool to send Alerts for issue detection.
+        c. As tool collects lot of system level statistics from the Gateway hosts by connecting over SSH, tool expects SSH Key based(Password less) authentication should be setup between monitoring host to monitored host.
+        d. As tool monitors URL/API over HTTP(s), tool expects HTTP(s)(over specific port) connectivity should be setup between monitoring host to monitored host.
         
 **Custom API Creation**
 
